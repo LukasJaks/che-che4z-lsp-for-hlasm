@@ -15,6 +15,7 @@
 #include "ca_constant.h"
 
 #include "ca_function.h"
+#include "expressions/conditional_assembly/ca_expr_visitor.h"
 
 namespace hlasm_plugin::parser_library::expressions {
 
@@ -38,6 +39,8 @@ void ca_constant::collect_diags() const
 
 bool ca_constant::is_character_expression() const { return false; }
 
+void ca_constant::apply(ca_expr_visitor& visitor) const { visitor.visit(*this); }
+
 context::SET_t ca_constant::evaluate(const evaluation_context&) const { return value; }
 
 context::A_t ca_constant::self_defining_term(
@@ -49,7 +52,7 @@ context::A_t ca_constant::self_defining_term(
         return context::object_traits<context::A_t>::default_v();
     }
 
-    switch (std::toupper(type.front()))
+    switch (std::toupper((unsigned char)type.front()))
     {
         case 'B':
             return ca_function::B2A(value, add_diagnostic).access_a();

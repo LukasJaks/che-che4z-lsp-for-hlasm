@@ -24,9 +24,7 @@
 
 // this file contains structures representing each statement field
 
-namespace hlasm_plugin {
-namespace parser_library {
-namespace semantics {
+namespace hlasm_plugin::parser_library::semantics {
 
 enum class label_si_type
 {
@@ -80,8 +78,8 @@ struct label_si
         , field_range(std::move(field_range))
     {}
 
-    const label_si_type type;
-    const range field_range;
+    label_si_type type;
+    range field_range;
 
     label_si_value_t value;
 };
@@ -116,8 +114,8 @@ struct instruction_si
         , value(context::id_storage::empty_id)
     {}
 
-    const instruction_si_type type;
-    const range field_range;
+    instruction_si_type type;
+    range field_range;
 
     instruction_si_value_t value;
 };
@@ -130,9 +128,24 @@ struct operands_si
         , value(std::move(operands))
     {}
 
-    const range field_range;
+    range field_range;
 
     operand_list value;
+};
+
+// struct holding semantic information (si) about deferred operand field
+struct deferred_operands_si
+{
+    deferred_operands_si(range field_range, std::string field, std::vector<vs_ptr> vars)
+        : field_range(std::move(field_range))
+        , value(std::move(field))
+        , vars(std::move(vars))
+    {}
+
+    range field_range;
+
+    std::string value;
+    std::vector<vs_ptr> vars;
 };
 
 // struct holding semantic information (si) about remark field
@@ -143,14 +156,10 @@ struct remarks_si
         , value(std::move(remarks))
     {}
 
-    const range field_range;
+    range field_range;
 
     std::vector<range> value;
 };
 
-
-
-} // namespace semantics
-} // namespace parser_library
-} // namespace hlasm_plugin
+} // namespace hlasm_plugin::parser_library::semantics
 #endif

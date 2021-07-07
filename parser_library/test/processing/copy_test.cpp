@@ -26,13 +26,13 @@ TEST(copy, copy_enter_fail)
  COPY UNKNOWN
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)0);
-    EXPECT_EQ(a.context().whole_copy_stack().size(), (size_t)0);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)0);
+    EXPECT_EQ(a.hlasm_ctx().whole_copy_stack().size(), (size_t)0);
 
     EXPECT_EQ(a.diags().size(), (size_t)2);
 }
@@ -44,16 +44,16 @@ TEST(copy, copy_enter_success)
  COPY COPYR
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
-    EXPECT_EQ(a.context().macros().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().macros().size(), (size_t)1);
 
-    EXPECT_TRUE(a.context().get_sequence_symbol(a.context().ids().add("A")));
+    EXPECT_TRUE(a.hlasm_ctx().get_sequence_symbol(a.hlasm_ctx().ids().add("A")));
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
 }
@@ -65,21 +65,21 @@ TEST(copy, copy_enter_diag_test)
  COPY COPYD
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     ASSERT_EQ(a.diags().size(), (size_t)1);
 
     auto diag = a.diags()[0];
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)2);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)2);
     EXPECT_EQ(a.diags()[0].file_name, "COPYD");
     EXPECT_EQ(a.diags()[0].related.size(), (size_t)1);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)1);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)1);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "start");
 }
 
@@ -93,23 +93,23 @@ TEST(copy, copy_jump)
  AIF (&VAR LT 4).A
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)2);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)2);
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("VAR"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("VAR"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<context::A_t>()
                   ->get_value(),
         4);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("VARX"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("VARX"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<context::A_t>()
                   ->get_value(),
@@ -123,12 +123,12 @@ TEST(copy, copy_unbalanced_macro)
  COPY COPYU
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
 
@@ -143,12 +143,12 @@ TEST(copy, copy_twice)
  COPY COPYR
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)2);
 }
@@ -162,16 +162,16 @@ TEST(copy, macro_call_from_copy_enter)
  M2
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
 
-    EXPECT_EQ(a.context().macros().size(), (size_t)2);
+    EXPECT_EQ(a.hlasm_ctx().macros().size(), (size_t)2);
 }
 
 TEST(copy, copy_enter_from_macro_call)
@@ -188,27 +188,30 @@ TEST(copy, copy_enter_from_macro_call)
  M
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
-    EXPECT_EQ(a.context().macros().size(), (size_t)2);
+    EXPECT_EQ(a.hlasm_ctx().macros().size(), (size_t)2);
 
-    auto mac = a.context().macros().find(a.context().ids().add("M"));
-    ASSERT_TRUE(mac != a.context().macros().end());
+    auto mac = a.hlasm_ctx().macros().find(a.hlasm_ctx().ids().add("M"));
+    ASSERT_TRUE(mac != a.hlasm_ctx().macros().end());
 
-    EXPECT_TRUE(mac->second->labels.find(a.context().ids().add("A")) != mac->second->labels.end());
-    EXPECT_TRUE(mac->second->labels.find(a.context().ids().add("B")) != mac->second->labels.end());
+    EXPECT_TRUE(mac->second->labels.find(a.hlasm_ctx().ids().add("A")) != mac->second->labels.end());
+    EXPECT_TRUE(mac->second->labels.find(a.hlasm_ctx().ids().add("B")) != mac->second->labels.end());
+
+    ASSERT_EQ(mac->second->used_copy_members.size(), 1U);
+    EXPECT_EQ(mac->second->used_copy_members.begin()->get()->name, a.hlasm_ctx().ids().add("COPYR"));
 
     ASSERT_EQ(a.diags().size(), (size_t)1);
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)16);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)16);
     EXPECT_EQ(a.diags()[0].file_name, "COPYR");
     ASSERT_EQ(a.diags()[0].related.size(), (size_t)1);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)5);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)5);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "start");
 }
 
@@ -224,15 +227,15 @@ TEST(copy, copy_enter_from_lookahead)
  
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("V"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("V"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<context::A_t>()
                   ->get_value(),
@@ -240,10 +243,10 @@ TEST(copy, copy_enter_from_lookahead)
 
     ASSERT_EQ(a.diags().size(), (size_t)1);
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)6);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)6);
     EXPECT_EQ(a.diags()[0].file_name, "COPYL");
     ASSERT_EQ(a.diags()[0].related.size(), (size_t)1);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)4);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)4);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "start");
 }
 
@@ -255,20 +258,20 @@ TEST(copy, nested_macro_copy_call)
  
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)2);
-    ASSERT_EQ(a.context().macros().size(), (size_t)1);
-    auto mac = a.context().macros().find(a.context().ids().add("MAC"));
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)2);
+    ASSERT_EQ(a.hlasm_ctx().macros().size(), (size_t)1);
+    auto mac = a.hlasm_ctx().macros().find(a.hlasm_ctx().ids().add("MAC"));
 
-    EXPECT_TRUE(mac->second->labels.find(a.context().ids().add("A")) != mac->second->labels.end());
+    EXPECT_TRUE(mac->second->labels.find(a.hlasm_ctx().ids().add("A")) != mac->second->labels.end());
 
-    EXPECT_EQ(a.context()
+    EXPECT_EQ(a.hlasm_ctx()
                   .globals()
-                  .find(a.context().ids().add("X"))
+                  .find(a.hlasm_ctx().ids().add("X"))
                   ->second->access_set_symbol_base()
                   ->access_set_symbol<context::A_t>()
                   ->get_value(),
@@ -286,22 +289,22 @@ TEST(copy, macro_from_copy_call)
  
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
-    ASSERT_EQ(a.context().macros().size(), (size_t)1);
-    auto mac = a.context().macros().find(a.context().ids().add("M"));
-    ASSERT_NE(a.context().macros().end(), mac);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
+    ASSERT_EQ(a.hlasm_ctx().macros().size(), (size_t)1);
+    auto mac = a.hlasm_ctx().macros().find(a.hlasm_ctx().ids().add("M"));
+    ASSERT_NE(a.hlasm_ctx().macros().end(), mac);
 
     ASSERT_EQ(a.diags().size(), (size_t)1);
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)3);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)3);
     EXPECT_EQ(a.diags()[0].file_name, "COPYBM");
     ASSERT_EQ(a.diags()[0].related.size(), (size_t)1);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)2);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)2);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "start");
 }
 
@@ -314,12 +317,12 @@ TEST(copy, inner_copy_jump)
  
 )";
     copy_mock mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)1);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
@@ -332,26 +335,26 @@ TEST(copy, jump_from_copy_fail)
  COPY COPYJF
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)2);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
 
-    EXPECT_EQ(a.diags()[1].diag_range.start.line, (position_t)2);
+    EXPECT_EQ(a.diags()[1].diag_range.start.line, (size_t)2);
     EXPECT_EQ(a.diags()[1].file_name, "COPYJF");
     ASSERT_EQ(a.diags()[1].related.size(), (size_t)1);
-    EXPECT_EQ(a.diags()[1].related[0].location.rang.start.line, (position_t)1);
+    EXPECT_EQ(a.diags()[1].related[0].location.rang.start.line, (size_t)1);
     EXPECT_EQ(a.diags()[1].related[0].location.uri, "start");
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)1);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)1);
     EXPECT_EQ(a.diags()[0].file_name, "COPYJF");
     ASSERT_EQ(a.diags()[0].related.size(), (size_t)1);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)1);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)1);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "start");
 }
 
@@ -367,22 +370,22 @@ TEST(copy, jump_in_macro_from_copy_fail)
  m
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)2);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)1);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)1);
     EXPECT_EQ(a.diags()[0].file_name, "COPYJF");
     ASSERT_EQ(a.diags()[0].related.size(), (size_t)2);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)3);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)3);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "start");
-    EXPECT_EQ(a.diags()[0].related[1].location.rang.start.line, (position_t)6);
+    EXPECT_EQ(a.diags()[0].related[1].location.rang.start.line, (size_t)6);
     EXPECT_EQ(a.diags()[0].related[1].location.uri, "start");
 }
 
@@ -399,24 +402,24 @@ TEST(copy, macro_nested_diagnostics)
  MAC  
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)2);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)2);
 
     EXPECT_EQ(a.diags().size(), (size_t)1);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
 
-    EXPECT_EQ(a.diags()[0].diag_range.start.line, (position_t)4);
+    EXPECT_EQ(a.diags()[0].diag_range.start.line, (size_t)4);
     EXPECT_EQ(a.diags()[0].file_name, "COPYND2");
     ASSERT_EQ(a.diags()[0].related.size(), (size_t)3);
-    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (position_t)1);
+    EXPECT_EQ(a.diags()[0].related[0].location.rang.start.line, (size_t)1);
     EXPECT_EQ(a.diags()[0].related[0].location.uri, "COPYND1");
-    EXPECT_EQ(a.diags()[0].related[1].location.rang.start.line, (position_t)3);
+    EXPECT_EQ(a.diags()[0].related[1].location.rang.start.line, (size_t)3);
     EXPECT_EQ(a.diags()[0].related[1].location.uri, "start");
-    EXPECT_EQ(a.diags()[0].related[2].location.rang.start.line, (position_t)7);
+    EXPECT_EQ(a.diags()[0].related[2].location.rang.start.line, (size_t)7);
     EXPECT_EQ(a.diags()[0].related[2].location.uri, "start");
 }
 
@@ -429,13 +432,53 @@ TEST(copy, copy_call_with_jump_before_comment)
  ANOP
 )";
     copy_mock mock;
-    analyzer a(input, "start", mock);
+    analyzer a(input, analyzer_options { "start", &mock });
     a.analyze();
 
     a.collect_diags();
 
-    EXPECT_EQ(a.context().copy_members().size(), (size_t)1);
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)1);
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
+}
+
+TEST(copy, copy_empty_file)
+{
+    std::string input =
+        R"(
+ MACRO
+ M
+ COPY COPYEMPTY
+ MEND
+
+ MACRO
+ M2
+ COPY EMPTY
+ MEND
+)";
+    copy_mock mock;
+    analyzer a(input, analyzer_options { "start", &mock });
+    a.analyze();
+
+    a.collect_diags();
+
+    EXPECT_EQ(a.hlasm_ctx().copy_members().size(), (size_t)2);
+
+    EXPECT_EQ(a.hlasm_ctx().macros().size(), (size_t)2);
+
+    auto mac = a.hlasm_ctx().get_macro_definition(a.hlasm_ctx().ids().add("M"));
+    ASSERT_TRUE(mac != nullptr);
+
+    ASSERT_EQ(mac->used_copy_members.size(), 2U);
+    EXPECT_EQ(mac->used_copy_members.count(a.hlasm_ctx().get_copy_member(a.hlasm_ctx().ids().add("EMPTY"))), 1U);
+    EXPECT_EQ(mac->used_copy_members.count(a.hlasm_ctx().get_copy_member(a.hlasm_ctx().ids().add("COPYEMPTY"))), 1U);
+
+    auto mac2 = a.hlasm_ctx().get_macro_definition(a.hlasm_ctx().ids().add("M2"));
+    ASSERT_TRUE(mac2 != nullptr);
+
+    ASSERT_EQ(mac2->used_copy_members.size(), 1U);
+    EXPECT_EQ(mac2->used_copy_members.count(a.hlasm_ctx().get_copy_member(a.hlasm_ctx().ids().add("EMPTY"))), 1U);
+
+    ASSERT_EQ(a.diags().size(), 0U);
 }

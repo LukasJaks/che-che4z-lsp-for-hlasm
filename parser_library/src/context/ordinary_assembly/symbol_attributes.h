@@ -19,9 +19,7 @@
 
 #include "context/common_types.h"
 
-namespace hlasm_plugin {
-namespace parser_library {
-namespace context {
+namespace hlasm_plugin::parser_library::context {
 
 // enumeration of all data attributes
 enum class data_attr_kind
@@ -69,7 +67,7 @@ struct symbol_attributes
     static symbol_attributes make_org_attrs();
 
     // helper function to transform char to enum
-    static data_attr_kind transform_attr(char c);
+    static data_attr_kind transform_attr(unsigned char c);
 
     static bool requires_ordinary_symbol(data_attr_kind attribute);
     static bool is_ordinary_attribute(data_attr_kind attribute);
@@ -108,7 +106,5 @@ private:
     len_attr integer_;
 };
 
-} // namespace context
-} // namespace parser_library
-} // namespace hlasm_plugin
+} // namespace hlasm_plugin::parser_library::context
 #endif

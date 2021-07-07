@@ -19,35 +19,31 @@
 
 #include "parser_library_export.h"
 
-namespace hlasm_plugin {
-namespace parser_library {
-namespace lexing {
+namespace hlasm_plugin::parser_library::lexing {
+struct logical_line;
 /*
-        custom ANTLRInputStream
-        supports input rewinding, appending and resetting
+    custom ANTLRInputStream
+    supports input rewinding, appending and resetting
 */
-class input_source : public antlr4::ANTLRInputStream
+class input_source final : public antlr4::ANTLRInputStream
 {
 public:
     input_source(const std::string& input);
 
     void append(const UTF32String& str);
-    void append(const std::string& str);
+    void append(std::string_view str);
     using antlr4::ANTLRInputStream::reset;
-    void reset(const std::string& str);
-    void rewind_input(size_t index);
+    void reset(std::string_view str);
+    void reset(const logical_line& l);
 
     input_source(const input_source&) = delete;
     input_source& operator=(const input_source&) = delete;
     input_source& operator=(input_source&&) = delete;
     input_source(input_source&&) = delete;
 
-    virtual std::string getText(const antlr4::misc::Interval& interval) override;
-
-    virtual ~input_source() = default;
+    std::string getText(const antlr4::misc::Interval& interval) override;
 };
-} // namespace lexing
-} // namespace parser_library
-} // namespace hlasm_plugin
+
+} // namespace hlasm_plugin::parser_library::lexing
 
 #endif

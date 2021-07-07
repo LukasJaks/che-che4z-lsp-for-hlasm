@@ -29,7 +29,6 @@ instruction returns [id_index instr]
 	| ORDSYMBOL
 	{
 		auto instr_id = parse_identifier($ORDSYMBOL->getText(),provider.get_range($ORDSYMBOL));
-		collector.add_lsp_symbol(instr_id,provider.get_range( $ORDSYMBOL),symbol_type::instruction);
 		collector.set_instruction_field(
 			instr_id,
 			provider.get_range($ORDSYMBOL));
@@ -37,7 +36,7 @@ instruction returns [id_index instr]
 	| bad_instr
 	{
 		collector.set_instruction_field(
-			ctx->ids().add($bad_instr.ctx->getText()),
+			hlasm_ctx->ids().add($bad_instr.ctx->getText()),
 			provider.get_range($bad_instr.ctx));
 	};
 
@@ -49,4 +48,4 @@ macro_name returns [std::string value]
 	: ORDSYMBOL macro_name_b								{$value = $ORDSYMBOL->getText(); $value.append(std::move($macro_name_b.value));};
 
 bad_instr
-	: IDENTIFIER ~(SPACE|EOLLN)*;
+	: IDENTIFIER ~(SPACE)*;

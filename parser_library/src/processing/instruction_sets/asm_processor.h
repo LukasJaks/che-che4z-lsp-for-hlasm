@@ -16,6 +16,7 @@
 #define PROCESSING_ASM_PROCESSOR_H
 
 #include "low_language_processor.h"
+#include "processing/opencode_provider.h"
 #include "semantics/operand_impls.h"
 #include "workspaces/parse_lib_provider.h"
 
@@ -30,19 +31,21 @@ class asm_processor : public low_language_processor
     checking::assembler_checker checker_;
 
 public:
-    asm_processor(context::hlasm_context& hlasm_ctx,
+    asm_processor(analyzing_context ctx,
         branching_provider& branch_provider,
         workspaces::parse_lib_provider& lib_provider,
-        statement_fields_parser& parser);
+        statement_fields_parser& parser,
+        opencode_provider& open_code);
 
-    virtual void process(context::shared_stmt_ptr stmt) override;
+    void process(context::shared_stmt_ptr stmt) override;
 
-    static void process_copy(const semantics::complete_statement& stmt,
-        context::hlasm_context& hlasm_ctx,
+    static bool process_copy(const semantics::complete_statement& stmt,
+        analyzing_context ctx,
         workspaces::parse_lib_provider& lib_provider,
         diagnosable_ctx* diagnoser);
 
 private:
+    opencode_provider* open_code_;
     process_table_t create_table(context::hlasm_context& hlasm_ctx);
 
     context::id_index find_sequence_symbol(const rebuilt_statement& stmt);
@@ -56,6 +59,7 @@ private:
     void process_EXTRN(rebuilt_statement stmt);
     void process_ORG(rebuilt_statement stmt);
     void process_OPSYN(rebuilt_statement stmt);
+    void process_AINSERT(rebuilt_statement stmt);
 
     template<checking::data_instr_type instr_type>
     void process_data_instruction(rebuilt_statement stmt);

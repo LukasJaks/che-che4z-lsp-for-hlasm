@@ -23,22 +23,29 @@
 namespace hlasm_plugin::parser_library::expressions {
 
 // represents unresolved list of terms in logical CA expression
-class ca_expr_list : public ca_expression
+class ca_expr_list final : public ca_expression
 {
 public:
     std::vector<ca_expr_ptr> expr_list;
 
     ca_expr_list(std::vector<ca_expr_ptr> expr_list, range expr_range);
 
-    virtual undef_sym_set get_undefined_attributed_symbols(const evaluation_context& eval_ctx) const override;
+    undef_sym_set get_undefined_attributed_symbols(const evaluation_context& eval_ctx) const override;
 
-    virtual void resolve_expression_tree(context::SET_t_enum kind) override;
+    void resolve_expression_tree(context::SET_t_enum kind) override;
 
-    virtual void collect_diags() const override;
+    void collect_diags() const override;
 
-    virtual bool is_character_expression() const override;
+    bool is_character_expression() const override;
 
-    virtual context::SET_t evaluate(const evaluation_context& eval_ctx) const override;
+    void apply(ca_expr_visitor& visitor) const override;
+
+    context::SET_t evaluate(const evaluation_context& eval_ctx) const override;
+
+    bool is_compatible(ca_expression_compatibility i) const override
+    {
+        return i == ca_expression_compatibility::aif || i == ca_expression_compatibility::setb;
+    }
 
 private:
     // this function is present due to the fact that in hlasm you can omit space between operator and operands if

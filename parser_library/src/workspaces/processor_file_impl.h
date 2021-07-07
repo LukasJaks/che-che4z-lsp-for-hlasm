@@ -17,9 +17,12 @@
 
 #include "analyzer.h"
 #include "file_impl.h"
+#include "macro_cache.h"
 #include "processor.h"
 
 namespace hlasm_plugin::parser_library::workspaces {
+
+class file_manager;
 
 // Implementation of the processor_file interface. Uses analyzer to parse the file
 // Then stores it until the next parsing so it is possible to retrieve parsing
@@ -27,39 +30,40 @@ namespace hlasm_plugin::parser_library::workspaces {
 class processor_file_impl : public virtual file_impl, public virtual processor_file
 {
 public:
-    processor_file_impl(std::string file_uri, std::atomic<bool>* cancel = nullptr);
-    processor_file_impl(file_impl&&, std::atomic<bool>* cancel = nullptr);
-    processor_file_impl(const file_impl& file, std::atomic<bool>* cancel = nullptr);
+    processor_file_impl(std::string file_uri, const file_manager& file_mngr, std::atomic<bool>* cancel = nullptr);
+    processor_file_impl(file_impl&&, const file_manager& file_mngr, std::atomic<bool>* cancel = nullptr);
+    processor_file_impl(const file_impl& file, const file_manager& file_mngr, std::atomic<bool>* cancel = nullptr);
     void collect_diags() const override;
     bool is_once_only() const override;
     // Starts parser with new (empty) context
-    virtual parse_result parse(parse_lib_provider&) override;
+    parse_result parse(parse_lib_provider&, asm_option) override;
     // Starts parser with in the context of parameter
-    virtual parse_result parse_macro(parse_lib_provider&, context::hlasm_context&, const library_data) override;
+    parse_result parse_macro(parse_lib_provider&, analyzing_context, library_data) override;
     // Starts parser with in the context of parameter, but does not affect LSP, HL info or parse_info_updated.
     // Used by the macro tracer.
-    virtual parse_result parse_no_lsp_update(parse_lib_provider&, context::hlasm_context&, const library_data) override;
-
-    // Returns true if parsing occured since this method was called last.
-    bool parse_info_updated() override;
+    parse_result parse_no_lsp_update(parse_lib_provider&, analyzing_context ctx, library_data) override;
 
     const std::set<std::string>& dependencies() override;
 
-    virtual ~processor_file_impl() = default;
-    virtual const semantics::lsp_info_processor& get_lsp_info() override;
-    virtual const std::set<std::string>& files_to_close() override;
-    virtual const performance_metrics& get_metrics() override;
+    const semantics::lines_info& get_hl_info() override;
+    const lsp::feature_provider& get_lsp_feature_provider() override;
+    const std::set<std::string>& files_to_close() override;
+    const performance_metrics& get_metrics() override;
+
+    void erase_cache_of_opencode(const std::string& opencode_file_name) override;
 
 private:
-    std::unique_ptr<analyzer> analyzer_;
+    std::unique_ptr<analyzer> opencode_analyzer_;
+    const analyzer* last_analyzer_;
 
     bool parse_inner(analyzer&);
 
-    bool parse_info_updated_ = false;
     std::atomic<bool>* cancel_;
 
     std::set<std::string> dependencies_;
     std::set<std::string> files_to_close_;
+
+    macro_cache macro_cache_;
 };
 
 } // namespace hlasm_plugin::parser_library::workspaces

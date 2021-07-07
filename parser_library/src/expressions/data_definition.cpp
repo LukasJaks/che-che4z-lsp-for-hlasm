@@ -195,7 +195,7 @@ bool data_definition::check_single_symbol_ok(const diagnostic_collector& add_dia
             add_diagnostic(
                 diagnostic_op::error_D030({ std::get<address_nominal>(expr_or_addr).base->get_range().start,
                                               std::get<address_nominal>(expr_or_addr).base->get_range().end },
-                    &type));
+                    std::string(1, type)));
             ret = false;
             continue;
         }
@@ -203,7 +203,7 @@ bool data_definition::check_single_symbol_ok(const diagnostic_collector& add_dia
         auto symbol = dynamic_cast<const mach_expr_symbol*>(expr);
         if (!symbol)
         {
-            add_diagnostic(diagnostic_op::error_D030(expr->get_range(), &type));
+            add_diagnostic(diagnostic_op::error_D030(expr->get_range(), std::string(1, type)));
             ret = false;
         }
     }
@@ -220,8 +220,8 @@ std::vector<context::id_index> data_definition::get_single_symbol_names() const
     for (const auto& expr_or_addr : nominal_value->access_exprs()->exprs)
     {
         const mach_expression* expr = std::get<mach_expr_ptr>(expr_or_addr).get();
-        auto symbol = dynamic_cast<const mach_expr_symbol*>(expr);
-        symbols.push_back(symbol->value);
+        const auto& symbol = dynamic_cast<const mach_expr_symbol&>(*expr);
+        symbols.push_back(symbol.value);
     }
     return symbols;
 }
@@ -378,11 +378,10 @@ data_definition::parser::parser(
     , p_(0)
     , exprs_i_(0)
 {
-    for (char& c : format_)
-        c = (char)toupper(c);
+    context::to_upper(format_);
 }
 
-bool is_number_char(char c) { return isdigit(c) || c == '-'; }
+bool is_number_char(unsigned char c) { return isdigit(c) || c == '-'; }
 
 size_t data_definition::parser::get_number_end(size_t begin)
 {

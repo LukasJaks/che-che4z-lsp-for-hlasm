@@ -22,10 +22,7 @@
 
 #include "parser_library_export.h"
 
-namespace hlasm_plugin {
-namespace parser_library {
-
-using position_t = uint64_t;
+namespace hlasm_plugin::parser_library {
 
 struct PARSER_LIBRARY_EXPORT position
 {
@@ -33,14 +30,29 @@ struct PARSER_LIBRARY_EXPORT position
         : line(0)
         , column(0)
     {}
-    position(position_t line, position_t column)
+    position(size_t line, size_t column)
         : line(line)
         , column(column)
     {}
     bool operator==(const position& oth) const { return line == oth.line && column == oth.column; }
     bool operator!=(const position& oth) const { return !(*this == oth); }
-    position_t line;
-    position_t column;
+    size_t line;
+    size_t column;
+
+    static inline position min(const position& lhs, const position& rhs)
+    {
+        if (lhs.line == rhs.line)
+            return position(lhs.line, std::min(lhs.column, rhs.column));
+        else
+            return (lhs.line < rhs.line) ? lhs : rhs;
+    }
+    static inline position max(const position& lhs, const position& rhs)
+    {
+        if (lhs.line == rhs.line)
+            return position(lhs.line, std::max(lhs.column, rhs.column));
+        else
+            return (lhs.line > rhs.line) ? lhs : rhs;
+    }
 };
 
 struct PARSER_LIBRARY_EXPORT range
@@ -59,6 +71,11 @@ struct PARSER_LIBRARY_EXPORT range
     position end;
 };
 
+inline range union_range(const range& lhs, const range& rhs)
+{
+    return range(position::min(lhs.start, rhs.start), position::max(lhs.end, rhs.end));
+}
+
 struct PARSER_LIBRARY_EXPORT file_range
 {
     file_range(range r, const std::string* file)
@@ -74,18 +91,5 @@ struct PARSER_LIBRARY_EXPORT file_range
     const std::string* file;
 };
 
-struct PARSER_LIBRARY_EXPORT location
-{
-    location() {}
-    location(position pos, std::string file)
-        : pos(pos)
-        , file(file)
-    {}
-    bool operator==(const location& oth) const { return pos == oth.pos && file == oth.file; }
-    position pos;
-    std::string file;
-};
-
-} // namespace parser_library
-} // namespace hlasm_plugin
+} // namespace hlasm_plugin::parser_library
 #endif

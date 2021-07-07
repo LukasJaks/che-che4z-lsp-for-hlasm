@@ -16,9 +16,8 @@
 
 #include "lexing/lexer.h"
 
-namespace hlasm_plugin {
-namespace parser_library {
-namespace parsing {
+namespace hlasm_plugin::parser_library::parsing {
+
 std::vector<antlr4::tree::ParseTree*> get_sub_trees(antlr4::tree::ParseTree* tree, size_t type)
 {
     std::vector<antlr4::tree::ParseTree*> return_trees;
@@ -72,7 +71,7 @@ void useful_tree::out_tree_rec(antlr4::ParserRuleContext* tree, std::string inde
         {
             auto type = ((antlr4::tree::TerminalNode*)tree)->getSymbol()->getType();
             stream << indent << vocab_.getSymbolicName(type);
-            if (type != parser_library::lexing::lexer::EOLLN && type != parser_library::lexing::lexer::SPACE)
+            if (type != parser_library::lexing::lexer::SPACE)
                 stream << ": "
                        << "\"" << tree->getText() << "\"";
             stream << std::endl;
@@ -89,6 +88,5 @@ void useful_tree::out_tree_rec(antlr4::ParserRuleContext* tree, std::string inde
         }
     }
 }
-} // namespace parsing
-} // namespace parser_library
-} // namespace hlasm_plugin
+
+} // namespace hlasm_plugin::parser_library::parsing

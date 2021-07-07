@@ -12,97 +12,24 @@
  *   Broadcom, Inc. - initial API and implementation
  */
 
-#include <iostream>
 #include <sstream>
 #include <string>
 
 #include "antlr4-runtime.h"
 #include "gtest/gtest.h"
 
+#include "analyzer.h"
 #include "hlasmparser.h"
 #include "lexing/input_source.h"
 #include "lexing/lexer.h"
 #include "lexing/token_stream.h"
 
+using namespace hlasm_plugin::parser_library;
+
 // tests lexer class:
-// AREAD, continuation statements, rewinding, token creation
+// continuation statements, rewinding, token creation
 
-using parser = hlasm_plugin::parser_library::parsing::hlasmparser;
-
-TEST(lexer_test, aread)
-{
-    std::string tcase = "aread";
-    std::string in =
-        R"(        AINSERT 'test string1',FRONT
-        AINSERT 'test string2',BACK
-&SYMBOL AREAD
-This does not go to symbol
-     INSTR 1,2,3)";
-
-    std::string out =
-        R"(AREAD
-IGNORED
-AREAD
-IGNORED
-AREAD
-IGNORED
-AREAD
-IGNORED
-AREAD
-IGNORED
-AMPERSAND
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-EOLLN
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-EOLLN
-SPACE
-ORDSYMBOL
-SPACE
-NUM
-COMMA
-NUM
-COMMA
-NUM
-EOLLN
-EOF
-)";
-
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = { "aread", "", nullptr, false };
-    hlasm_plugin::parser_library::lexing::input_source input(in);
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
-    hlasm_plugin::parser_library::lexing::token_stream tokens(&l);
-    parser parser(&tokens);
-
-    l.ainsert_back("INSERTED BACK 1");
-    l.aread();
-    l.ainsert_back("INSERTED BACK 2");
-    l.ainsert_front("INSERTED FRONT 1");
-    l.aread();
-    l.aread();
-    l.aread();
-    l.aread();
-
-    tokens.fill();
-
-    std::stringstream token_stream;
-    for (auto token : tokens.getTokens())
-        token_stream << parser.getVocabulary().getSymbolicName(token->getType()) << std::endl;
-    auto token_string = token_stream.str();
-
-    ASSERT_EQ(token_string, out);
-}
+using parser = parsing::hlasmparser;
 
 TEST(lexer_test, rntest)
 {
@@ -110,19 +37,17 @@ TEST(lexer_test, rntest)
 SPACE
 ORDSYMBOL
 SPACE
-EOLLN
 SPACE
 ORDSYMBOL
 SPACE
 ORDSYMBOL
-EOLLN
 EOF
 )";
 
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = { "rntest", "", nullptr, false };
-    hlasm_plugin::parser_library::lexing::input_source input("TEST TEST \r\n TEST1 TEST2");
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
-    hlasm_plugin::parser_library::lexing::token_stream tokens(&l);
+    semantics::source_info_processor src_proc(false);
+    lexing::input_source input("TEST TEST \r\n TEST1 TEST2");
+    lexing::lexer l(&input, &src_proc);
+    lexing::token_stream tokens(&l);
     parser parser(&tokens);
 
     tokens.fill();
@@ -133,33 +58,6 @@ EOF
     auto token_string = token_stream.str();
 
     ASSERT_EQ(token_string, out);
-}
-
-TEST(lexer_test, new_line_in_ignored)
-{
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = {
-        "new_line_in_ignored", "", nullptr, false
-    };
-    // test case, when a newline is in the first 15 ignored characters after continuation
-    hlasm_plugin::parser_library::lexing::input_source input(
-        R"(NAME1 OP1      OPERAND1,OPERAND2,OPERAND3   This is the normal         X
-        
-label lr 1,1)");
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
-    hlasm_plugin::parser_library::lexing::token_stream tokens(&l);
-    parser parser(&tokens);
-
-    tokens.fill();
-
-    std::stringstream token_stream;
-    size_t eolln_count = 0;
-    for (auto token : tokens.getTokens())
-    {
-        if (parser.getVocabulary().getSymbolicName(token->getType()) == "EOLLN")
-            ++eolln_count;
-    }
-
-    EXPECT_EQ(eolln_count, (size_t)2);
 }
 
 TEST(lexer_test, unlimited_line)
@@ -186,7 +84,6 @@ SPACE
 ORDSYMBOL
 SPACE
 ORDSYMBOL
-EOLLN
 IGNORED
 SPACE
 ORDSYMBOL
@@ -194,7 +91,6 @@ SPACE
 NUM
 SPACE
 ORDSYMBOL
-EOLLN
 IGNORED
 SPACE
 ORDSYMBOL
@@ -209,14 +105,13 @@ SPACE
 ORDSYMBOL
 SPACE
 ORDSYMBOL
-EOLLN
 EOF
 )";
 
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = { "unlimited_line", "", nullptr, false };
-    hlasm_plugin::parser_library::lexing::input_source input(in);
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
-    hlasm_plugin::parser_library::lexing::token_stream tokens(&l);
+    semantics::source_info_processor src_proc(false);
+    lexing::input_source input(in);
+    lexing::lexer l(&input, &src_proc);
+    lexing::token_stream tokens(&l);
     parser parser(&tokens);
     l.set_unlimited_line(true);
 
@@ -230,93 +125,16 @@ EOF
     ASSERT_EQ(token_string, out);
 }
 
-TEST(lexer_test, rewind_input)
-{
-    std::string in =
-        R"(    REWIND1
-REWIND2
-    REWIND3)";
-    std::string out = R"(SPACE
-ORDSYMBOL
-SPACE
-ORDSYMBOL
-EOLLN
-ORDSYMBOL
-ORDSYMBOL
-EOLLN
-ORDSYMBOL
-EOLLN
-SPACE
-ORDSYMBOL
-ORDSYMBOL
-EOLLN
-SPACE
-ORDSYMBOL
-EOLLN
-EOF
-)";
-    hlasm_plugin::parser_library::lexing::input_source input(in);
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = { "rewind_input", "", nullptr, false };
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
-    hlasm_plugin::parser_library::lexing::token_stream tokens(&l);
-    parser parser(&tokens);
-
-    std::stringstream token_stream;
-    hlasm_plugin::parser_library::lexing::token_ptr token;
-    do
-    {
-        token = l.nextToken();
-        token_stream << parser.getVocabulary().getSymbolicName(token->getType()) << std::endl;
-        if (token->getText() == "REWIND1")
-        {
-            l.rewind_input({ 0, 0 });
-            break;
-        }
-    } while (token->getType() != antlr4::Token::EOF);
-
-    do
-    {
-        token = l.nextToken();
-        token_stream << parser.getVocabulary().getSymbolicName(token->getType()) << std::endl;
-        if (token->getText() == "REWIND2")
-        {
-            l.rewind_input({ 0, 4 });
-            break;
-        }
-    } while (token->getType() != antlr4::Token::EOF);
-
-    do
-    {
-        token = l.nextToken();
-        token_stream << parser.getVocabulary().getSymbolicName(token->getType()) << std::endl;
-        if (token->getText() == "REWIND3")
-        {
-            l.rewind_input({ 1, 17 });
-            break;
-        }
-    } while (token->getType() != antlr4::Token::EOF);
-
-    do
-    {
-        token = l.nextToken();
-        token_stream << parser.getVocabulary().getSymbolicName(token->getType()) << std::endl;
-    } while (token->getType() != antlr4::Token::EOF);
-
-    auto token_string = token_stream.str();
-
-    ASSERT_EQ(token_string, out);
-}
-
 TEST(lexer_test, special_spaces)
 {
     std::string in = "A\v\f\t LR";
-    hlasm_plugin::parser_library::lexing::input_source input(in);
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = { "", "", nullptr, false };
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
+    lexing::input_source input(in);
+    semantics::source_info_processor src_proc(false);
+    lexing::lexer l(&input, &src_proc);
 
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::IDENTIFIER);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::SPACE);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::ORDSYMBOL);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::IDENTIFIER);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::SPACE);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::ORDSYMBOL);
 }
 
 TEST(lexer_test, attribute_in_continuation)
@@ -326,19 +144,39 @@ TEST(lexer_test, attribute_in_continuation)
                'SYMBOL
 )";
 
-    hlasm_plugin::parser_library::semantics::lsp_info_processor lsp_proc = { "", "", nullptr, false };
-    hlasm_plugin::parser_library::lexing::input_source input(in);
-    hlasm_plugin::parser_library::lexing::lexer l(&input, &lsp_proc);
+    semantics::source_info_processor src_proc(false);
+    lexing::input_source input(in);
+    lexing::lexer l(&input, &src_proc);
 
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::SPACE);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::ORDSYMBOL);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::SPACE);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::NUM);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::COMMA);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::ORDSYMBOL);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::CONTINUATION);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::IGNORED);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::IGNORED);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::ATTR);
-    ASSERT_EQ(l.nextToken()->getType(), hlasm_plugin::parser_library::lexing::lexer::ORDSYMBOL);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::SPACE);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::ORDSYMBOL);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::SPACE);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::NUM);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::COMMA);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::ORDSYMBOL);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::CONTINUATION);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::IGNORED);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::IGNORED);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::ATTR);
+    ASSERT_EQ(l.nextToken()->getType(), lexing::lexer::ORDSYMBOL);
+}
+
+TEST(lexer_test, bad_continuation)
+{
+    std::string in =
+        R"( SAM31                                                                 X
+ err
+)";
+    analyzer a(in);
+    a.analyze();
+
+    a.collect_diags();
+    auto& diags = a.diags();
+
+    ASSERT_EQ(diags.size(), (size_t)1);
+    EXPECT_EQ(diags[0].code, "E001");
+    EXPECT_EQ(diags[0].diag_range.start.line, 1);
+    EXPECT_EQ(diags[0].diag_range.start.column, 0);
+    EXPECT_EQ(diags[0].diag_range.end.line, 1);
+    EXPECT_EQ(diags[0].diag_range.end.column, 4);
 }

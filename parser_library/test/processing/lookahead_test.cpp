@@ -34,8 +34,8 @@ TEST(lookahead, forward_jump_success)
     analyzer a(input);
     a.analyze();
 
-    auto id = a.context().ids().add("new");
-    auto var = a.context().get_var_sym(id);
+    auto id = a.hlasm_ctx().ids().add("new");
+    auto var = a.hlasm_ctx().get_var_sym(id);
     EXPECT_FALSE(var);
 }
 
@@ -57,8 +57,8 @@ TEST(lookahead, forward_jump_to_continued)
     EXPECT_EQ(a.diags().size(), (size_t)0);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
 
-    EXPECT_FALSE(a.context().get_var_sym(a.context().ids().add("bad")));
-    EXPECT_TRUE(a.context().get_var_sym(a.context().ids().add("good")));
+    EXPECT_FALSE(a.hlasm_ctx().get_var_sym(a.hlasm_ctx().ids().add("bad")));
+    EXPECT_TRUE(a.hlasm_ctx().get_var_sym(a.hlasm_ctx().ids().add("good")));
 }
 
 TEST(lookahead, forward_jump_from_continued)
@@ -80,8 +80,8 @@ TEST(lookahead, forward_jump_from_continued)
     EXPECT_EQ(a.diags().size(), (size_t)0);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
 
-    EXPECT_FALSE(a.context().get_var_sym(a.context().ids().add("bad")));
-    EXPECT_TRUE(a.context().get_var_sym(a.context().ids().add("good")));
+    EXPECT_FALSE(a.hlasm_ctx().get_var_sym(a.hlasm_ctx().ids().add("bad")));
+    EXPECT_TRUE(a.hlasm_ctx().get_var_sym(a.hlasm_ctx().ids().add("good")));
 }
 
 TEST(lookahead, forward_jump_success_valid_input)
@@ -98,8 +98,8 @@ tr9023-22
     analyzer a(input);
     a.analyze();
 
-    auto id = a.context().ids().add("new");
-    auto var = a.context().get_var_sym(id);
+    auto id = a.hlasm_ctx().ids().add("new");
+    auto var = a.hlasm_ctx().get_var_sym(id);
     EXPECT_FALSE(var);
     EXPECT_EQ(a.parser().getNumberOfSyntaxErrors(), (size_t)0);
 }
@@ -116,8 +116,8 @@ TEST(lookahead, forward_jump_fail)
     analyzer a(input);
     a.analyze();
 
-    auto id = a.context().ids().add("new");
-    auto var = a.context().get_var_sym(id);
+    auto id = a.hlasm_ctx().ids().add("new");
+    auto var = a.hlasm_ctx().get_var_sym(id);
     EXPECT_TRUE(var);
 }
 
@@ -176,7 +176,7 @@ TEST(lookahead, forward_jump_before_continued_comment)
  AGO .A
  BAD_INSTR
 *COMMENT                                                               X IGNORED
- IGNORED         COMMENT
+                 COMMENT
 .A ANOP
 )");
 
@@ -194,7 +194,7 @@ TEST(attribute_lookahead, lookup_triggered)
     auto& expr = a.parser().expr()->ca_expr;
 
     lib_prov_mock lib;
-    evaluation_context eval_ctx { a.context(), lib };
+    evaluation_context eval_ctx { analyzing_context { a.context() }, lib };
 
     EXPECT_EQ(expr->get_undefined_attributed_symbols(eval_ctx).size(), (size_t)1);
 
@@ -208,25 +208,25 @@ TEST(attribute_lookahead, nested_lookup_triggered)
     auto& expr = a.parser().expr()->ca_expr;
 
     lib_prov_mock lib;
-    evaluation_context eval_ctx { a.context(), lib };
+    evaluation_context eval_ctx { analyzing_context { a.context() }, lib };
 
-    auto v1 = a.context().create_local_variable<context::C_t>(a.context().ids().add("V1"), false);
+    auto v1 = a.hlasm_ctx().create_local_variable<context::C_t>(a.hlasm_ctx().ids().add("V1"), false);
     v1->access_set_symbol<context::C_t>()->set_value("A", 0);
-    auto v2 = a.context().create_local_variable<context::C_t>(a.context().ids().add("V2"), true);
+    auto v2 = a.hlasm_ctx().create_local_variable<context::C_t>(a.hlasm_ctx().ids().add("V2"), true);
     v2->access_set_symbol<context::C_t>()->set_value("B");
 
     auto res = expr->get_undefined_attributed_symbols(eval_ctx);
     ASSERT_EQ(res.size(), (size_t)1);
-    EXPECT_TRUE(res.find(a.context().ids().add("B")) != res.end());
+    EXPECT_TRUE(res.find(a.hlasm_ctx().ids().add("B")) != res.end());
 
-    a.context().ord_ctx.add_symbol_reference(context::symbol(a.context().ids().add("B"),
+    a.hlasm_ctx().ord_ctx.add_symbol_reference(context::symbol(a.hlasm_ctx().ids().add("B"),
         context::symbol_value(),
         context::symbol_attributes(context::symbol_origin::EQU, 'U'_ebcdic, 1),
         location()));
 
     res = expr->get_undefined_attributed_symbols(eval_ctx);
     ASSERT_EQ(res.size(), (size_t)1);
-    EXPECT_TRUE(res.find(a.context().ids().add("A")) != res.end());
+    EXPECT_TRUE(res.find(a.hlasm_ctx().ids().add("A")) != res.end());
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
 }
@@ -238,11 +238,11 @@ TEST(attribute_lookahead, lookup_not_triggered)
     auto& expr = a.parser().expr()->ca_expr;
 
     lib_prov_mock lib;
-    evaluation_context eval_ctx { a.context(), lib };
+    evaluation_context eval_ctx { analyzing_context { a.context() }, lib };
 
     // define symbol with undefined length
-    auto tmp = a.context().ord_ctx.create_symbol(
-        a.context().ids().add("X"), symbol_value(), symbol_attributes(symbol_origin::DAT, 200), {});
+    auto tmp = a.hlasm_ctx().ord_ctx.create_symbol(
+        a.hlasm_ctx().ids().add("X"), symbol_value(), symbol_attributes(symbol_origin::DAT, 200), {});
     ASSERT_TRUE(tmp);
 
     // although length is undefined the actual symbol is defined so no lookup should happen
@@ -258,7 +258,7 @@ TEST(attribute_lookahead, lookup_of_two_refs)
     auto& expr = a.parser().expr()->ca_expr;
 
     lib_prov_mock lib;
-    evaluation_context eval_ctx { a.context(), lib };
+    evaluation_context eval_ctx { analyzing_context { a.context() }, lib };
 
     EXPECT_EQ(expr->get_undefined_attributed_symbols(eval_ctx).size(), (size_t)2);
 
@@ -272,7 +272,7 @@ TEST(attribute_lookahead, lookup_of_two_refs_but_one_symbol)
     auto& expr = a.parser().expr()->ca_expr;
 
     lib_prov_mock lib;
-    evaluation_context eval_ctx { a.context(), lib };
+    evaluation_context eval_ctx { analyzing_context { a.context() }, lib };
 
     EXPECT_EQ(expr->get_undefined_attributed_symbols(eval_ctx).size(), (size_t)1);
 
@@ -294,20 +294,20 @@ Y EQU X+1
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<C_t>()
                   ->get_value(),
         "T");
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("B"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("B"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         10);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("C"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("C"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -328,8 +328,8 @@ X EQU 1,10,C'T'
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -350,8 +350,8 @@ X EQU 1,Y+11,C'T'
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -375,8 +375,8 @@ X EQU 1,2,**&
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -399,8 +399,8 @@ X EQU 1,2,&a
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -423,8 +423,8 @@ X EQU &a,2
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -447,8 +447,8 @@ X EQU =**)-,2
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -479,8 +479,8 @@ X EQU 1,2,C'X'
 &AFTER_MAC SETB 1
 )";
 
-    virtual parse_result parse_library(
-        const std::string& library, context::hlasm_context& hlasm_ctx, const library_data data) override
+public:
+    parse_result parse_library(const std::string& library, analyzing_context ctx, library_data data) override
     {
         std::string* content;
         if (library == "LIB")
@@ -492,13 +492,13 @@ X EQU 1,2,C'X'
         else
             return false;
 
-        a = std::make_unique<analyzer>(*content, library, hlasm_ctx, *this, data);
+        a = std::make_unique<analyzer>(*content, analyzer_options { library, this, std::move(ctx), data });
         a->analyze();
         a->collect_diags();
         return true;
     }
 
-    virtual bool has_library(const std::string&, context::hlasm_context&) const override { return false; }
+    bool has_library(const std::string&, const std::string&) const override { return false; }
 };
 
 TEST(attribute_lookahead, lookup_to_copy)
@@ -512,30 +512,30 @@ TEST(attribute_lookahead, lookup_to_copy)
 )");
 
     look_parse_lib_prov mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         2);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("WAS_BEFORE"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("WAS_BEFORE"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
         true);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("WAS_IN"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("WAS_IN"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
         true);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("WAS_AFTER"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("WAS_AFTER"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
@@ -555,30 +555,30 @@ X EQU 1,2
 )");
 
     look_parse_lib_prov mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         2);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("WAS_BEFORE"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("WAS_BEFORE"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
         true);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("WAS_IN"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("WAS_IN"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
         true);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("WAS_AFTER"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("WAS_AFTER"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
@@ -603,19 +603,19 @@ X EQU 1,2
 )");
 
     look_parse_lib_prov mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
+    EXPECT_EQ(a.hlasm_ctx()
                   .globals()
-                  .find(a.context().ids().add("A"))
+                  .find(a.hlasm_ctx().ids().add("A"))
                   ->second->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         2);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("AFTER_MAC"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("AFTER_MAC"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<B_t>()
                   ->get_value(),
@@ -634,7 +634,7 @@ TEST(attribute_lookahead, lookup_from_macro_last_line)
          GETMAIN   b=svc)");
 
     look_parse_lib_prov mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
     a.collect_diags();
 
@@ -652,7 +652,7 @@ TEST(attribute_lookahead, lookup_from_macro_one_to_last_line)
 )");
 
     look_parse_lib_prov mock;
-    analyzer a(input, "", mock);
+    analyzer a(input, analyzer_options { &mock });
     a.analyze();
     a.collect_diags();
 
@@ -672,8 +672,8 @@ Y EQU 2,11
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -695,14 +695,14 @@ X LR 1,1
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         2);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("B"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("B"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<C_t>()
                   ->get_value(),
@@ -724,14 +724,14 @@ X CSECT
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         1);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("B"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("B"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<C_t>()
                   ->get_value(),
@@ -754,20 +754,20 @@ X DC FS24'6'       remark
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
         4);
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("B"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("B"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<C_t>()
                   ->get_value(),
         "F");
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("C"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("C"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -788,8 +788,8 @@ X DC C'A'
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -811,8 +811,8 @@ Y EQU 2,11
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -833,8 +833,8 @@ X EQU 1,10
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -857,8 +857,8 @@ B EQU 2,22
     a.analyze();
     a.collect_diags();
 
-    EXPECT_EQ(a.context()
-                  .get_var_sym(a.context().ids().add("A"))
+    EXPECT_EQ(a.hlasm_ctx()
+                  .get_var_sym(a.hlasm_ctx().ids().add("A"))
                   ->access_set_symbol_base()
                   ->access_set_symbol<A_t>()
                   ->get_value(),
@@ -939,7 +939,7 @@ C DC C'STH'
     a.collect_diags();
 
     EXPECT_EQ(a.diags().size(), (size_t)0);
-    auto var = a.context().get_var_sym(a.context().ids().add("VAR"));
+    auto var = a.context().hlasm_ctx->get_var_sym(a.context().hlasm_ctx->ids().add("VAR"));
     ASSERT_NE(var, nullptr);
     ASSERT_EQ(var->var_kind, variable_kind::SET_VAR_KIND);
     auto value = var->access_set_symbol_base()->access_set_symbol<int>()->get_value(2);
@@ -967,4 +967,20 @@ A DC AL(*-B+2)(*)
     ASSERT_EQ(a.diags().size(), (size_t)1);
     EXPECT_EQ(a.diags().front().severity, diagnostic_severity::warning);
     EXPECT_EQ(a.diags().front().diag_range.start.line, (size_t)5);
+}
+
+TEST(attribute_lookahead, ignore_invalid_code)
+{
+    std::string input = R"(
+      AIF (L'C GT 0).SKIP
+      'invalid
+.SKIP ANOP
+C     DC C'STH'
+)";
+
+    analyzer a(input);
+    a.analyze();
+    a.collect_diags();
+
+    EXPECT_EQ(a.diags().size(), (size_t)0);
 }

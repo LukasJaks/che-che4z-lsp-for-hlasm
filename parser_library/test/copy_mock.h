@@ -51,29 +51,30 @@ class copy_mock : public workspaces::parse_lib_provider
             return &content_COPYND2;
         else if (library == "COPYBM")
             return &content_COPYBM;
+        else if (library == "EMPTY")
+            return &content_EMPTY;
+        else if (library == "COPYEMPTY")
+            return &content_COPYEMPTY;
         else
             return nullptr;
     }
 
 public:
-    virtual workspaces::parse_result parse_library(
-        const std::string& library, context::hlasm_context& hlasm_ctx, const workspaces::library_data data)
+    workspaces::parse_result parse_library(
+        const std::string& library, analyzing_context ctx, workspaces::library_data data) override
     {
         current_content = find_content(library);
         if (!current_content)
             return false;
 
         holder.push_back(std::move(a));
-        a = std::make_unique<analyzer>(*current_content, library, hlasm_ctx, *this, data);
+        a = std::make_unique<analyzer>(*current_content, analyzer_options { library, this, std::move(ctx), data });
         a->analyze();
         a->collect_diags();
         return true;
     }
-    virtual bool has_library(const std::string& library, context::hlasm_context& hlasm_ctx) const
-    {
-        (void)hlasm_ctx;
-        return find_content(library);
-    }
+    bool has_library(const std::string& library, const std::string&) const override { return find_content(library); }
+
     std::vector<std::unique_ptr<analyzer>> holder;
     std::unique_ptr<analyzer> a;
 
@@ -194,6 +195,8 @@ private:
  LR 1
  MEND
 )";
+    const std::string content_EMPTY = "";
+    const std::string content_COPYEMPTY = " COPY EMPTY";
 };
 
 } // namespace hlasm_plugin::parser_library

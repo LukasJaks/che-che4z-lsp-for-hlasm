@@ -23,24 +23,21 @@ namespace hlasm_plugin::parser_library {
 class mock_parse_lib_provider : public workspaces::parse_lib_provider
 {
 public:
-    virtual workspaces::parse_result parse_library(
-        const std::string& library, context::hlasm_context& hlasm_ctx, const workspaces::library_data data) override
+    workspaces::parse_result parse_library(
+        const std::string&, analyzing_context ctx, workspaces::library_data data) override
     {
-        (void)library;
+        analyzer a(data.proc_kind == processing::processing_kind::MACRO ? macro_contents : copy_contents,
+            analyzer_options {
+                data.proc_kind == processing::processing_kind::MACRO ? MACRO_FILE : COPY_FILE,
+                this,
+                std::move(ctx),
+                data,
+            });
 
-        if (data.proc_kind == processing::processing_kind::MACRO)
-        {
-            analyzer a(macro_contents, MACRO_FILE, hlasm_ctx, *this, data);
-            a.analyze();
-        }
-        else
-        {
-            analyzer a(copy_contents, COPY_FILE, hlasm_ctx, *this, data);
-            a.analyze();
-        }
+        a.analyze();
         return true;
     }
-    virtual bool has_library(const std::string&, context::hlasm_context&) const override { return true; }
+    bool has_library(const std::string&, const std::string&) const override { return true; }
 
 private:
     const std::string macro_contents =

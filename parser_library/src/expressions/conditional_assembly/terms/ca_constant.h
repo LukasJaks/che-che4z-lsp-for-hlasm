@@ -25,22 +25,26 @@
 namespace hlasm_plugin::parser_library::expressions {
 
 // represents CA expression constant
-class ca_constant : public ca_expression
+class ca_constant final : public ca_expression
 {
 public:
     const context::A_t value;
 
     ca_constant(context::A_t value, range expr_range);
 
-    virtual undef_sym_set get_undefined_attributed_symbols(const evaluation_context& eval_ctx) const override;
+    undef_sym_set get_undefined_attributed_symbols(const evaluation_context& eval_ctx) const override;
 
-    virtual void resolve_expression_tree(context::SET_t_enum kind) override;
+    void resolve_expression_tree(context::SET_t_enum kind) override;
 
-    virtual void collect_diags() const override;
+    void collect_diags() const override;
 
-    virtual bool is_character_expression() const override;
+    bool is_character_expression() const override;
 
-    virtual context::SET_t evaluate(const evaluation_context& eval_ctx) const override;
+    void apply(ca_expr_visitor& visitor) const override;
+
+    context::SET_t evaluate(const evaluation_context& eval_ctx) const override;
+
+    bool is_compatible(ca_expression_compatibility i) const override { return i == ca_expression_compatibility::setb; }
 
     static context::A_t self_defining_term(
         std::string_view type, std::string_view value, diagnostic_adder& add_diagnostic);

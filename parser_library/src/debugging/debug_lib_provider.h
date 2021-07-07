@@ -22,7 +22,7 @@ namespace hlasm_plugin::parser_library::debugging {
 // Implements dependency (macro and COPY files) fetcher for macro tracer.
 // Takes the information from a workspace, but calls special methods for
 // parsing that do not collide with LSP.
-class debug_lib_provider : public workspaces::parse_lib_provider
+class debug_lib_provider final : public workspaces::parse_lib_provider
 {
     const workspaces::workspace& ws_;
 
@@ -31,23 +31,23 @@ public:
         : ws_(ws)
     {}
 
-    virtual workspaces::parse_result parse_library(
-        const std::string& library, context::hlasm_context& hlasm_ctx, const workspaces::library_data data) override
+    workspaces::parse_result parse_library(
+        const std::string& library, analyzing_context ctx, workspaces::library_data data) override
     {
-        auto& proc_grp = ws_.get_proc_grp_by_program(hlasm_ctx.opencode_file_name());
+        auto& proc_grp = ws_.get_proc_grp_by_program(ctx.hlasm_ctx->opencode_file_name());
         for (auto&& lib : proc_grp.libraries())
         {
             std::shared_ptr<workspaces::processor> found = lib->find_file(library);
             if (found)
-                return found->parse_no_lsp_update(*this, hlasm_ctx, data);
+                return found->parse_no_lsp_update(*this, std::move(ctx), data);
         }
 
         return false;
     }
 
-    virtual bool has_library(const std::string& library, context::hlasm_context& hlasm_ctx) const override
+    bool has_library(const std::string& library, const std::string& program) const override
     {
-        auto& proc_grp = ws_.get_proc_grp_by_program(hlasm_ctx.opencode_file_name());
+        auto& proc_grp = ws_.get_proc_grp_by_program(program);
         for (auto&& lib : proc_grp.libraries())
         {
             std::shared_ptr<workspaces::processor> found = lib->find_file(library);

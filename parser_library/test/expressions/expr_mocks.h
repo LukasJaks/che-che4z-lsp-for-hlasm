@@ -22,18 +22,18 @@ using namespace hlasm_plugin::parser_library;
 
 class dep_sol_mock : public context::dependency_solver
 {
-    virtual const context::symbol* get_symbol(context::id_index) const { return nullptr; };
+    const context::symbol* get_symbol(context::id_index) const override { return nullptr; };
 };
 
 class lib_prov_mock : public workspaces::parse_lib_provider
 {
-    virtual workspaces::parse_result parse_library(
-        const std::string&, context::hlasm_context&, const workspaces::library_data)
+public:
+    workspaces::parse_result parse_library(const std::string&, analyzing_context, workspaces::library_data) override
     {
         return false;
     };
 
-    virtual bool has_library(const std::string&, context::hlasm_context&) const { return false; }
+    bool has_library(const std::string&, const std::string&) const override { return false; }
 };
 
 inline std::string big_string(char c = '1')

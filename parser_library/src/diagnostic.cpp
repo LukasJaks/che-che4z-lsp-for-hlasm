@@ -1231,7 +1231,7 @@ diagnostic_op diagnostic_op::error_M113(const std::string& instr_name, const ran
 {
     return diagnostic_op(diagnostic_severity::error,
         "M113",
-        "Error at " + instr_name + " instruction: operand must be an absolute register immediate value",
+        "Error at " + instr_name + " instruction: operand must be relocatable symbol or an absolute  immediate value",
         range);
 }
 
@@ -1272,7 +1272,7 @@ diagnostic_op diagnostic_op::error_M123(const std::string& instr_name, long long
 {
     return diagnostic_op(diagnostic_severity::error,
         "M123",
-        "Error at " + instr_name + " instruction: register immediate operand absolute value must be between "
+        "Error at " + instr_name + " instruction: relocatable symbol or immediate absolute value must be between "
             + std::to_string(from) + " and " + std::to_string(to),
         range);
 }
@@ -1478,6 +1478,14 @@ diagnostic_op diagnostic_op::warn_D025(const range& range, const std::string& ty
         diagnostic_severity::warning, "D025", "The " + modifier + " modifier is ignored with type " + type, range);
 }
 
+diagnostic_op diagnostic_op::warn_D031(const range& range, const std::string& operand_value)
+{
+    return diagnostic_op(diagnostic_severity::warning,
+        "D031",
+        "Using absolute value '" + operand_value + "' as relative immediate value",
+        range);
+}
+
 diagnostic_op diagnostic_op::error_D026(const range& range)
 {
     return diagnostic_op(diagnostic_severity::error, "D026", "Invalid round mode", range);
@@ -1595,6 +1603,11 @@ diagnostic_op diagnostic_op::error_M200(const std::string& instr_name, const ran
 }
 
 // diagnostic_s errors
+diagnostic_op diagnostic_op::error_E001(const range& range)
+{
+    return diagnostic_op(
+        diagnostic_severity::error, "E001", "Continued line does not begin with required number of blanks", range);
+}
 
 diagnostic_op diagnostic_op::error_E010(const std::string& message, const range& range)
 {
@@ -1773,6 +1786,18 @@ diagnostic_op diagnostic_op::error_E068(const range& range)
         diagnostic_severity::error, "E068", "Operand value falls outside of current section/LOCTR", range);
 }
 
+diagnostic_op diagnostic_op::error_E069(const range& range)
+{
+    return diagnostic_op(
+        diagnostic_severity::error, "E069", "AREAD instruction can only be called from within a macro", range);
+}
+
+diagnostic_op diagnostic_op::error_E070(const range& range)
+{
+    return diagnostic_op(
+        diagnostic_severity::error, "E070", "Invalid AREAD operand. Use AREAD [NOSTMT|NOPRINT|CLOCKB|CLOCKD].", range);
+}
+
 diagnostic_op diagnostic_op::error_E044(const range& range)
 {
     return diagnostic_op(diagnostic_severity::error, "E044", "Illegal name field in macro prototype, discarded", range);
@@ -1843,6 +1868,12 @@ diagnostic_op diagnostic_op::error_ME001(const range& range)
 diagnostic_op diagnostic_op::error_ME002(const range& range)
 {
     return diagnostic_op(diagnostic_severity::error, "ME002", "multiplication or division of address", range);
+}
+
+diagnostic_op diagnostic_op::error_ME003(const range& range)
+{
+    return diagnostic_op(
+        diagnostic_severity::error, "ME003", "Relative Immediate operand must evaluate into an even offset.", range);
 }
 
 diagnostic_op diagnostic_op::error_CE001(const range& range)
@@ -1921,6 +1952,12 @@ diagnostic_op diagnostic_op::error_CE015(const range& range)
     return diagnostic_op(diagnostic_severity::error, "CE015", "Invalid self-defining term", range);
 }
 
+diagnostic_op diagnostic_op::error_CE016_logical_expression_parenthesis(const range& range)
+{
+    return diagnostic_op(
+        diagnostic_severity::error, "CE016", "Logical expression must be enclosed in parenthesis.", range);
+}
+
 diagnostic_op diagnostic_op::error_CW001(const range& range)
 {
     return diagnostic_op(diagnostic_severity::warning, "CW001", "Substring count points past string end", range);
@@ -1955,6 +1992,49 @@ diagnostic_s diagnostic_s::error_W004(const std::string& file_name, const std::s
         "W0004",
         "The configuration file pgm_conf for workspace " + ws_name
             + " refers to a processor group, that is not defined in proc_grps",
+        {});
+}
+
+diagnostic_s diagnostic_s::error_W005(const std::string& file_name, const std::string& proc_group)
+{
+    return diagnostic_s(file_name,
+        {},
+        diagnostic_severity::warning,
+        "W0005",
+        "The processor group '" + proc_group + "' from '" + file_name + "' defines invalid assembler options.",
+        {});
+}
+
+diagnostic_s diagnostic_s::error_L0001(const std::string& path)
+{
+    return diagnostic_s(path, {}, "L0001", "Unable to load library: " + path + ".");
+}
+
+diagnostic_s diagnostic_s::error_L0002(const std::string& path)
+{
+    return diagnostic_s(
+        "", {}, "L0002", "Unable to load library: " + path + ". Error: The path does not point to directory.");
+}
+
+diagnostic_s diagnostic_s::warning_L0003(const std::string& path)
+{
+    return diagnostic_s("",
+        {},
+        diagnostic_severity::warning,
+        "L0003",
+        "Macros from library '" + path
+            + "' were selected by a deprecated mechanism to specify file extensions (alwaysRecognize in "
+              "pgm_conf.json).",
+        {});
+}
+
+diagnostic_s diagnostic_s::warning_L0004(const std::string& path, const std::string& macro_name)
+{
+    return diagnostic_s("",
+        {},
+        diagnostic_severity::warning,
+        "L0004",
+        "Library '" + path + "' contains multiple definitions of the macro '" + macro_name + "'.",
         {});
 }
 

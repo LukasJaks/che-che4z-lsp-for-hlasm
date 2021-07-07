@@ -50,6 +50,12 @@ public:
         right_->fill_location_counter(std::move(addr));
     }
 
+    void apply(mach_expr_visitor& visitor) const override
+    {
+        left_->apply(visitor);
+        right_->apply(visitor);
+    }
+
     const mach_expression* leftmost_term() const override { return left_->leftmost_term(); }
 
     void collect_diags() const override
@@ -77,14 +83,13 @@ public:
 
     context::dependency_collector get_dependencies(mach_evaluate_info info) const override;
 
-    virtual value_t evaluate(mach_evaluate_info info) const override;
+    value_t evaluate(mach_evaluate_info info) const override;
 
-    virtual void fill_location_counter(context::address addr) override
-    {
-        child_->fill_location_counter(std::move(addr));
-    }
+    void fill_location_counter(context::address addr) override { child_->fill_location_counter(std::move(addr)); }
 
-    virtual const mach_expression* leftmost_term() const override { return child_->leftmost_term(); }
+    void apply(mach_expr_visitor& visitor) const override { child_->apply(visitor); }
+
+    const mach_expression* leftmost_term() const override { return child_->leftmost_term(); }
 
     void collect_diags() const override { collect_diags_from_child(*child_); }
 };
@@ -97,6 +102,13 @@ struct add
 };
 
 struct sub
+{
+    static std::string sign_char() { return "-"; }
+    static std::string sign_char_begin() { return "-"; }
+    static std::string sign_char_end() { return ""; }
+};
+
+struct rel_addr
 {
     static std::string sign_char() { return "-"; }
     static std::string sign_char_begin() { return "-"; }
@@ -131,6 +143,23 @@ template<>
 inline mach_expression::value_t mach_expr_binary<sub>::evaluate(mach_evaluate_info info) const
 {
     return left_->evaluate(info) - right_->evaluate(info);
+}
+
+template<>
+inline mach_expression::value_t mach_expr_binary<rel_addr>::evaluate(mach_evaluate_info info) const
+{
+    auto location = left_->evaluate(info);
+    auto target = right_->evaluate(info);
+    if (target.value_kind() == context::symbol_value_kind::ABS)
+    {
+        add_diagnostic(diagnostic_op::warn_D031(get_range(), std::to_string(target.get_abs())));
+        return target;
+    }
+
+    auto result = target - location;
+    if (result.value_kind() == context::symbol_value_kind::ABS && result.get_abs() % 2 != 0)
+        add_diagnostic(diagnostic_op::error_ME003(get_range()));
+    return result;
 }
 
 template<>
@@ -190,6 +219,12 @@ inline context::dependency_collector mach_expr_binary<add>::get_dependencies(mac
 
 template<>
 inline context::dependency_collector mach_expr_binary<sub>::get_dependencies(mach_evaluate_info info) const
+{
+    return left_->get_dependencies(info) - right_->get_dependencies(info);
+}
+
+template<>
+inline context::dependency_collector mach_expr_binary<rel_addr>::get_dependencies(mach_evaluate_info info) const
 {
     return left_->get_dependencies(info) - right_->get_dependencies(info);
 }

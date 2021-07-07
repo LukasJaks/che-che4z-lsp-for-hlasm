@@ -130,8 +130,8 @@ void file_impl::did_change(range range, std::string new_text)
     size_t range_end_line = (size_t)range.end.line;
     size_t range_start_line = (size_t)range.start.line;
 
-    size_t begin = index_from_location(range.start);
-    size_t end = index_from_location(range.end);
+    size_t begin = index_from_position(text_, lines_ind_, range.start);
+    size_t end = index_from_position(text_, lines_ind_, range.end);
 
     text_.replace(begin, end - begin, new_text);
 
@@ -230,30 +230,31 @@ bool utf8_four_byte_begin(char ch)
     return (ch & 0xF8) == 0xF0; // 11110xxx
 }
 
-// returns the location in text_ that corresponds to utf-16 based location
-size_t file_impl::index_from_location(position loc) const
+size_t file_impl::index_from_position(const std::string& text, const std::vector<size_t>& line_indices, position loc)
 {
     size_t end = (size_t)loc.column;
-    size_t i = lines_ind_[(size_t)loc.line];
+    if (loc.line >= line_indices.size())
+        return text.size();
+    size_t i = line_indices[loc.line];
     size_t utf16_counter = 0;
 
-    while (utf16_counter < end)
+    while (utf16_counter < end && i < text.size())
     {
-        if (!utf8_one_byte_begin(text_[i]))
+        if (!utf8_one_byte_begin(text[i]))
         {
             char width;
             char utf16_width;
-            if (utf8_four_byte_begin(text_[i])) // 11110xxx
+            if (utf8_four_byte_begin(text[i])) // 11110xxx
             {
                 width = 4;
                 utf16_width = 2;
             }
-            else if (utf8_three_byte_begin(text_[i])) // 1110xxxx
+            else if (utf8_three_byte_begin(text[i])) // 1110xxxx
             {
                 width = 3;
                 utf16_width = 1;
             }
-            else if (utf8_two_byte_begin(text_[i])) // 110xxxxx
+            else if (utf8_two_byte_begin(text[i])) // 110xxxxx
             {
                 width = 2;
                 utf16_width = 1;
@@ -273,47 +274,42 @@ size_t file_impl::index_from_location(position loc) const
     return i;
 }
 
-std::string file_impl::replace_non_utf8_chars(const std::string& text)
+std::string file_impl::replace_non_utf8_chars(std::string_view text)
 {
     std::string ret;
     ret.reserve(text.size());
-    size_t i = 0;
-    while (i < text.size())
+    while (!text.empty())
     {
-        bool OK = true;
         size_t ch_len = 0;
-        if (utf8_one_byte_begin(text[i]))
+        if (utf8_one_byte_begin(text.front()))
             ch_len = 1;
-        else if (utf8_two_byte_begin(text[i]))
+        else if (utf8_two_byte_begin(text.front()))
             ch_len = 2;
-        else if (utf8_three_byte_begin(text[i]))
+        else if (utf8_three_byte_begin(text.front()))
             ch_len = 3;
-        else if (utf8_four_byte_begin(text[i]))
+        else if (utf8_four_byte_begin(text.front()))
             ch_len = 4;
-        else
-            OK = false;
+
+        bool OK = ch_len != 0 && ch_len <= text.size();
 
         // check whether all subsequent bytes of one character begin with 10
+        // otherwise we consider the first byte a wrong character
         if (OK)
+            OK = std::all_of(text.begin() + 1, text.begin() + ch_len, utf8_continue_byte);
+
+        if (OK && ch_len == 4)
         {
-            for (size_t j = 1; j < ch_len; ++j)
-            {
-                if (i + j >= text.size() || !utf8_continue_byte(text[i + j]))
-                {
-                    OK = false; // we consider the first byte of character wrong
-                    break;
-                }
-            }
+            // Unicode limit 0x10FFFF
+            unsigned char c0 = text[0];
+            unsigned char c1 = text[1];
+            OK = ((c0 & 0b0000'0111) << 6 | (c1 & 0b00111111)) <= 0x10f;
         }
 
         if (OK)
         {
             // copy the character to output
-            for (size_t j = 0; j < ch_len; ++j)
-            {
-                ret.push_back(text[i + j]);
-            }
-            i += ch_len;
+            ret.append(text.substr(0, ch_len));
+            text.remove_prefix(ch_len);
         }
         else
         {
@@ -321,10 +317,19 @@ std::string file_impl::replace_non_utf8_chars(const std::string& text)
             ret.push_back((uint8_t)0xEF);
             ret.push_back((uint8_t)0xBF);
             ret.push_back((uint8_t)0xBD);
-            ++i;
+            text.remove_prefix(1);
         }
     }
     return ret;
 }
+
+std::vector<size_t> file_impl::create_line_indices(const std::string& text)
+{
+    std::vector<size_t> ret;
+    ret.push_back(0);
+    find_newlines(text, ret);
+    return ret;
+}
+
 
 } // namespace hlasm_plugin::parser_library::workspaces

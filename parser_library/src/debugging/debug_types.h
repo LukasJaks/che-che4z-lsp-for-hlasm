@@ -37,15 +37,15 @@ struct source
 
 struct stack_frame
 {
-    stack_frame(position_t begin_line, position_t end_line, uint32_t id, std::string name, source source)
+    stack_frame(size_t begin_line, size_t end_line, uint32_t id, std::string name, source source)
         : begin_line(begin_line)
         , end_line(end_line)
         , id(id)
         , name(std::move(name))
         , frame_source(std::move(source))
     {}
-    position_t begin_line;
-    position_t end_line;
+    size_t begin_line;
+    size_t end_line;
     uint32_t id;
     std::string name;
     source frame_source;
@@ -55,17 +55,6 @@ struct stack_frame
             && frame_source == oth.frame_source;
     }
 };
-
-struct breakpoints
-{
-    breakpoints(source source, std::vector<breakpoint> breakpoints)
-        : bps_source(std::move(source))
-        , points(std::move(breakpoints))
-    {}
-    source bps_source;
-    std::vector<breakpoint> points;
-};
-
 
 struct scope
 {
@@ -77,6 +66,11 @@ struct scope
     std::string name;
     source scope_source;
     var_reference_t var_reference;
+};
+
+struct variable_store
+{
+    std::vector<variable_ptr> variables;
 };
 
 } // namespace hlasm_plugin::parser_library::debugging

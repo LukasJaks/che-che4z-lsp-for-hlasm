@@ -18,6 +18,7 @@
 #include "data_def_postponed_statement.h"
 #include "ebcdic_encoding.h"
 #include "expressions/mach_expr_term.h"
+#include "expressions/mach_expr_visitor.h"
 #include "postponed_statement_impl.h"
 #include "processing/context_manager.h"
 
@@ -219,23 +220,23 @@ void asm_processor::process_data_instruction(rebuilt_statement stmt)
             context::symbol_attributes::scale_attr scale = context::symbol_attributes::undef_scale;
 
             auto tmp = data_op->get_operand_value(hlasm_ctx.ord_ctx);
-            auto value = dynamic_cast<checking::data_definition_operand*>(tmp.get());
+            auto& value = dynamic_cast<checking::data_definition_operand&>(*tmp);
 
             if (!data_op->value->length
                 || !data_op->value->length->get_dependencies(hlasm_ctx.ord_ctx).contains_dependencies())
             {
-                len = value->get_length_attribute();
+                len = value.get_length_attribute();
             }
             if (data_op->value->scale
                 && !data_op->value->scale->get_dependencies(hlasm_ctx.ord_ctx).contains_dependencies())
             {
-                scale = value->get_scale_attribute();
+                scale = value.get_scale_attribute();
             }
             create_symbol(stmt.stmt_range_ref(),
                 label,
                 std::move(adr),
                 context::symbol_attributes(
-                    context::symbol_origin::DAT, type, len, scale, value->get_integer_attribute()));
+                    context::symbol_origin::DAT, type, len, scale, value.get_integer_attribute()));
         }
         else
             add_diagnostic(diagnostic_op::error_E031("symbol", stmt.label_ref().field_range));
@@ -312,7 +313,7 @@ void asm_processor::process_COPY(rebuilt_statement stmt)
 
     if (stmt.operands_ref().value.size() == 1 && stmt.operands_ref().value.front()->access_asm()->access_expr())
     {
-        process_copy(stmt, hlasm_ctx, lib_provider, this);
+        process_copy(stmt, ctx, lib_provider, this);
     }
     else
     {
@@ -492,12 +493,14 @@ void asm_processor::process_OPSYN(rebuilt_statement stmt)
     }
 }
 
-asm_processor::asm_processor(context::hlasm_context& hlasm_ctx,
+asm_processor::asm_processor(analyzing_context ctx,
     branching_provider& branch_provider,
     workspaces::parse_lib_provider& lib_provider,
-    statement_fields_parser& parser)
-    : low_language_processor(hlasm_ctx, branch_provider, lib_provider, parser)
-    , table_(create_table(hlasm_ctx))
+    statement_fields_parser& parser,
+    opencode_provider& open_code)
+    : low_language_processor(ctx, branch_provider, lib_provider, parser)
+    , table_(create_table(*ctx.hlasm_ctx))
+    , open_code_(&open_code)
 {}
 
 void asm_processor::process(context::shared_stmt_ptr stmt)
@@ -527,8 +530,8 @@ void asm_processor::process(context::shared_stmt_ptr stmt)
     }
 }
 
-void asm_processor::process_copy(const semantics::complete_statement& stmt,
-    context::hlasm_context& hlasm_ctx,
+bool asm_processor::process_copy(const semantics::complete_statement& stmt,
+    analyzing_context ctx,
     workspaces::parse_lib_provider& lib_provider,
     diagnosable_ctx* diagnoser)
 {
@@ -539,24 +542,24 @@ void asm_processor::process_copy(const semantics::complete_statement& stmt,
     {
         if (diagnoser)
             diagnoser->add_diagnostic(diagnostic_op::error_E058(stmt.operands_ref().value.front()->operand_range));
-        return;
+        return false;
     }
 
-    auto tmp = hlasm_ctx.copy_members().find(sym_expr->value);
+    auto tmp = ctx.hlasm_ctx->copy_members().find(sym_expr->value);
 
-    if (tmp == hlasm_ctx.copy_members().end())
+    if (tmp == ctx.hlasm_ctx->copy_members().end())
     {
         bool result = lib_provider.parse_library(
-            *sym_expr->value, hlasm_ctx, workspaces::library_data { processing_kind::COPY, sym_expr->value });
+            *sym_expr->value, ctx, workspaces::library_data { processing_kind::COPY, sym_expr->value });
 
         if (!result)
         {
             if (diagnoser)
                 diagnoser->add_diagnostic(diagnostic_op::error_E058(stmt.operands_ref().value.front()->operand_range));
-            return;
+            return false;
         }
     }
-    auto whole_copy_stack = hlasm_ctx.whole_copy_stack();
+    auto whole_copy_stack = ctx.hlasm_ctx->whole_copy_stack();
 
     auto cycle_tmp = std::find(whole_copy_stack.begin(), whole_copy_stack.end(), sym_expr->value);
 
@@ -564,31 +567,34 @@ void asm_processor::process_copy(const semantics::complete_statement& stmt,
     {
         if (diagnoser)
             diagnoser->add_diagnostic(diagnostic_op::error_E062(stmt.stmt_range_ref()));
-        return;
+        return false;
     }
 
-    hlasm_ctx.enter_copy_member(sym_expr->value);
+    ctx.hlasm_ctx->enter_copy_member(sym_expr->value);
+
+    return true;
 }
 
-asm_processor::process_table_t asm_processor::create_table(context::hlasm_context& ctx)
+asm_processor::process_table_t asm_processor::create_table(context::hlasm_context& h_ctx)
 {
     process_table_t table;
-    table.emplace(ctx.ids().add("CSECT"),
+    table.emplace(h_ctx.ids().add("CSECT"),
         std::bind(&asm_processor::process_sect, this, context::section_kind::EXECUTABLE, std::placeholders::_1));
-    table.emplace(ctx.ids().add("DSECT"),
+    table.emplace(h_ctx.ids().add("DSECT"),
         std::bind(&asm_processor::process_sect, this, context::section_kind::DUMMY, std::placeholders::_1));
-    table.emplace(ctx.ids().add("RSECT"),
+    table.emplace(h_ctx.ids().add("RSECT"),
         std::bind(&asm_processor::process_sect, this, context::section_kind::READONLY, std::placeholders::_1));
-    table.emplace(ctx.ids().add("COM"),
+    table.emplace(h_ctx.ids().add("COM"),
         std::bind(&asm_processor::process_sect, this, context::section_kind::COMMON, std::placeholders::_1));
-    table.emplace(ctx.ids().add("LOCTR"), std::bind(&asm_processor::process_LOCTR, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("EQU"), std::bind(&asm_processor::process_EQU, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("DC"), std::bind(&asm_processor::process_DC, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("DS"), std::bind(&asm_processor::process_DS, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("COPY"), std::bind(&asm_processor::process_COPY, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("EXTRN"), std::bind(&asm_processor::process_EXTRN, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("ORG"), std::bind(&asm_processor::process_ORG, this, std::placeholders::_1));
-    table.emplace(ctx.ids().add("OPSYN"), std::bind(&asm_processor::process_OPSYN, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("LOCTR"), std::bind(&asm_processor::process_LOCTR, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("EQU"), std::bind(&asm_processor::process_EQU, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("DC"), std::bind(&asm_processor::process_DC, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("DS"), std::bind(&asm_processor::process_DS, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().well_known.COPY, std::bind(&asm_processor::process_COPY, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("EXTRN"), std::bind(&asm_processor::process_EXTRN, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("ORG"), std::bind(&asm_processor::process_ORG, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("OPSYN"), std::bind(&asm_processor::process_OPSYN, this, std::placeholders::_1));
+    table.emplace(h_ctx.ids().add("AINSERT"), std::bind(&asm_processor::process_AINSERT, this, std::placeholders::_1));
 
     return table;
 }
@@ -605,6 +611,41 @@ context::id_index asm_processor::find_sequence_symbol(const rebuilt_statement& s
         default:
             return context::id_storage::empty_id;
     }
+}
+
+namespace {
+class AINSERT_operand_visitor final : public expressions::mach_expr_visitor
+{
+public:
+    // Inherited via mach_expr_visitor
+    void visit(const expressions::mach_expr_constant&) override {}
+    void visit(const expressions::mach_expr_data_attr&) override {}
+    void visit(const expressions::mach_expr_symbol& expr) override { value = expr.value; }
+    void visit(const expressions::mach_expr_location_counter&) override {}
+    void visit(const expressions::mach_expr_self_def&) override {}
+    void visit(const expressions::mach_expr_default&) override {}
+
+    context::id_index value = nullptr;
+};
+} // namespace
+
+void asm_processor::process_AINSERT(rebuilt_statement stmt)
+{
+    const auto& ops = stmt.operands_ref();
+
+    if (!check(stmt, hlasm_ctx, checker_, *this))
+        return;
+
+    const auto& record = dynamic_cast<const semantics::string_assembler_operand&>(*ops.value[0]).value;
+    AINSERT_operand_visitor visitor;
+    dynamic_cast<const semantics::expr_assembler_operand&>(*ops.value[1]).expression->apply(visitor);
+    auto [value] = visitor;
+
+    if (!value)
+        return;
+    auto dest = *value == "FRONT" ? processing::ainsert_destination::front : processing::ainsert_destination::back;
+
+    open_code_->ainsert(record, dest);
 }
 
 } // namespace hlasm_plugin::parser_library::processing

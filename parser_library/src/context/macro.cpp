@@ -35,12 +35,14 @@ macro_definition::macro_definition(id_index name,
     statement_block definition,
     copy_nest_storage copy_nests,
     label_storage labels,
-    location definition_location)
+    location definition_location,
+    std::unordered_set<copy_member_ptr> used_copy_members)
     : label_param_name_(label_param_name)
     , id(name)
     , copy_nests(std::move(copy_nests))
     , labels(std::move(labels))
     , definition_location(std::move(definition_location))
+    , used_copy_members(std::move(used_copy_members))
 {
     for (auto&& stmt : definition)
         cached_definition.emplace_back(std::move(stmt));
@@ -111,10 +113,9 @@ macro_invo_ptr macro_definition::call(
             if (tmp == named_params_.end() || tmp->second->param_type == macro_param_type::POS_PAR_TYPE)
                 throw std::invalid_argument("use of undefined keyword parameter");
 
-            auto key_par = dynamic_cast<const keyword_param*>(tmp->second);
-            assert(key_par);
+            const auto& key_par = dynamic_cast<const keyword_param&>(*tmp->second);
             named_cpy.emplace(
-                param.id, std::make_unique<keyword_param>(param.id, key_par->default_data, std::move(param.data)));
+                param.id, std::make_unique<keyword_param>(param.id, key_par.default_data, std::move(param.data)));
         }
         else
         {
@@ -156,6 +157,18 @@ macro_invo_ptr macro_definition::call(
 }
 
 bool macro_definition::operator=(const macro_definition& m) { return id == m.id; }
+
+const std::vector<std::unique_ptr<positional_param>>& macro_definition::get_positional_params() const
+{
+    return positional_params_;
+}
+
+const std::vector<std::unique_ptr<keyword_param>>& macro_definition::get_keyword_params() const
+{
+    return keyword_params_;
+}
+
+const id_index& macro_definition::get_label_param_name() const { return label_param_name_; }
 
 macro_invocation::macro_invocation(id_index name,
     cached_block& cached_definition,

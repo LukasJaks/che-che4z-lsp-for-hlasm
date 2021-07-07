@@ -39,11 +39,9 @@ bool is_sign(size_t input)
 // return last symbol before eolln in line
 int get_end_index(antlr4::TokenStream* input_stream, int start)
 {
-    while (start < (int)input_stream->size())
+    if (start < (int)input_stream->size())
     {
-        if (input_stream->get(start)->getType() == EOLLN)
-            return start - 1;
-        start++;
+        return (int)input_stream->size() - 1;
     }
     return -1;
 }
@@ -215,7 +213,7 @@ void parser_error_listener_base::syntaxError(
             add_parser_diagnostic(range(position(line, char_pos_in_line)),
                 diagnostic_severity::error,
                 "S0006",
-                "Unexpected sign in an epxression");
+                "Unexpected sign in an expression");
         // apostrophe expected
         else if (odd_apostrophes && is_expected(APOSTROPHE, expected_tokens))
             add_parser_diagnostic(
@@ -235,7 +233,7 @@ void parser_error_listener_base::syntaxError(
     {
         auto offender = excp.getOffendingToken();
 
-        if (offender->getType() == EOLLN)
+        if (offender->getType() == antlr4::Token::EOF)
             add_parser_diagnostic(range(position(line, char_pos_in_line)),
                 diagnostic_severity::error,
                 "S0003",

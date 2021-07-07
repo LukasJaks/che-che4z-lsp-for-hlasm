@@ -19,13 +19,12 @@
 #include <unordered_map>
 
 #include "common_types.h"
+#include "copy_member.h"
 #include "sequence_symbol.h"
 #include "statement_cache.h"
 #include "variables/macro_param.h"
 
-namespace hlasm_plugin {
-namespace parser_library {
-namespace context {
+namespace hlasm_plugin::parser_library::context {
 
 // struct wrapping macro call args
 struct macro_arg
@@ -51,8 +50,8 @@ using label_storage = std::unordered_map<id_index, sequence_symbol_ptr>;
 using copy_nest_storage = std::vector<std::vector<location>>;
 
 // class representing macro definition
-// contains info about keyword, positional parameters of HLASM mascro as well as derivation tree of the actual code
-// has methods call to represent macro instruction call
+// contains info about keyword, positional parameters of HLASM macro as well as list of statements
+// has the 'call' method to represent macro instruction call
 // serves as prototype for creating macro_invocation objects
 class macro_definition
 {
@@ -76,6 +75,7 @@ public:
     const label_storage labels;
     // location of the macro definition in code
     const location definition_location;
+    const std::unordered_set<copy_member_ptr> used_copy_members;
     // initializes macro with its name and params - positional or keyword
     macro_definition(id_index name,
         id_index label_param_name,
@@ -83,13 +83,18 @@ public:
         statement_block definition,
         copy_nest_storage copy_nests,
         label_storage labels,
-        location definition_location);
+        location definition_location,
+        std::unordered_set<copy_member_ptr> used_copy_members);
 
     // returns object with parameters' data set to actual parameters in macro call
     macro_invo_ptr call(macro_data_ptr label_param_data, std::vector<macro_arg> actual_params, id_index syslist_name);
 
     // satifying unordered_map needs
     bool operator=(const macro_definition& m);
+
+    const std::vector<std::unique_ptr<positional_param>>& get_positional_params() const;
+    const std::vector<std::unique_ptr<keyword_param>>& get_keyword_params() const;
+    const id_index& get_label_param_name() const;
 };
 
 // represent macro instruction call
@@ -120,7 +125,6 @@ public:
         const location& definition_location);
 };
 
-} // namespace context
-} // namespace parser_library
-} // namespace hlasm_plugin
+} // namespace hlasm_plugin::parser_library::context
+
 #endif
